@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdaptWorld - Efficient World Models for Physical AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --world-blue: #3b82f6;
+            --world-emerald: #10b981;
+            --world-amber: #f59e0b;
+            --world-rose: #f43f5e;
+            --world-violet: #8b5cf6;
+            --bg-deep: #0c0c14;
+            --bg-surface: #14141f;
+            --bg-card: #1c1c2a;
+            --bg-elevated: #252535;
+            --text-white: #f8fafc;
+            --text-light: #cbd5e1;
+            --text-muted: #64748b;
+            --border: #2d2d42;
+            --gradient-world: linear-gradient(135deg, #10b981 0%, #3b82f6 50%, #8b5cf6 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-white);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Perspective grid background */
+        .perspective-grid {
+            position: fixed;
+            inset: 0;
+            background: 
+                linear-gradient(180deg, transparent 50%, var(--bg-deep) 100%),
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 49px,
+                    rgba(59, 130, 246, 0.08) 50px
+                ),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 49px,
+                    rgba(59, 130, 246, 0.08) 50px
+                );
+            background-size: 100% 100%, 50px 50px, 50px 50px;
+            transform: perspective(500px) rotateX(60deg) translateY(100px);
+            transform-origin: center top;
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: linear-gradient(180deg, var(--bg-deep) 60%, transparent 100%);
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-cube {
+            width: 48px;
+            height: 48px;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: cubeFloat 6s ease-in-out infinite;
+        }
+
+        @keyframes cubeFloat {
+            0%, 100% { transform: rotateX(-20deg) rotateY(0deg); }
+            50% { transform: rotateX(-20deg) rotateY(180deg); }
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--world-emerald);
+            background: rgba(16, 185, 129, 0.1);
+            left: 6px;
+            top: 6px;
+        }
+
+        .cube-face.front { transform: translateZ(18px); }
+        .cube-face.back { transform: rotateY(180deg) translateZ(18px); }
+        .cube-face.left { transform: rotateY(-90deg) translateZ(18px); }
+        .cube-face.right { transform: rotateY(90deg) translateZ(18px); }
+        .cube-face.top { transform: rotateX(90deg) translateZ(18px); border-color: var(--world-blue); background: rgba(59, 130, 246, 0.15); }
+        .cube-face.bottom { transform: rotateX(-90deg) translateZ(18px); }
+
+        .logo-text {
+            font-size: 1.6rem;
+            font-weight: 800;
+            background: var(--gradient-world);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-subtitle {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .header-badges {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            padding: 0.45rem 0.9rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .badge.active {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--world-emerald);
+            color: var(--world-emerald);
+        }
+
+        .main {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(135deg, var(--text-white) 0%, var(--world-emerald) 50%, var(--world-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-light);
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.7;
+            font-weight: 300;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-surface);
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .card-title-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--gradient-world);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+
+        .card-body { padding: 1.5rem; }
+
+        /* Environment Selector */
+        .env-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .env-card {
+            background: var(--bg-elevated);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .env-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--gradient-world);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .env-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--world-emerald);
+        }
+
+        .env-card.selected {
+            border-color: var(--world-emerald);
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+        }
+
+        .env-card.selected::before {
+            opacity: 0.05;
+        }
+
+        .env-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .env-name {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            position: relative;
+        }
+
+        .env-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            position: relative;
+        }
+
+        .env-stats {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            font-size: 0.7rem;
+            position: relative;
+        }
+
+        .env-stat {
+            padding: 0.3rem 0.6rem;
+            background: var(--bg-surface);
+            border-radius: 4px;
+        }
+
+        .env-stat-value {
+            color: var(--world-emerald);
+            font-family: 'Source Code Pro', monospace;
+            font-weight: 600;
+        }
+
+        /* World Simulation Canvas */
+        .world-container {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            height: 400px;
+        }
+
+        .world-canvas {
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(ellipse at center bottom, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+                var(--bg-deep);
+        }
+
+        .world-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+            transform: perspective(500px) rotateX(45deg);
+            transform-origin: center bottom;
+        }
+
+        .world-object {
+            position: absolute;
+            transition: all 0.5s ease-out;
+        }
+
+        .robot {
+            width: 50px;
+            height: 70px;
+            background: linear-gradient(180deg, var(--world-blue) 0%, #1d4ed8 100%);
+            border-radius: 10px 10px 5px 5px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+        }
+
+        .robot::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 15px;
+            background: #93c5fd;
+            border-radius: 3px;
+            box-shadow: 0 0 15px rgba(147, 197, 253, 0.5);
+        }
+
+        .robot::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 5px;
+            right: 5px;
+            height: 15px;
+            background: #1e40af;
+            border-radius: 0 0 3px 3px;
+        }
+
+        .obstacle {
+            background: linear-gradient(135deg, var(--world-amber), #d97706);
+            border-radius: 4px;
+            box-shadow: 0 5px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .target {
+            background: radial-gradient(circle, var(--world-emerald), #059669);
+            border-radius: 50%;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+            animation: targetPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes targetPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .prediction-path {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .path-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--world-violet);
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+
+        .world-hud {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            right: 1rem;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            background: rgba(20, 20, 31, 0.9);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            font-family: 'Source Code Pro', monospace;
+            font-size: 0.75rem;
+        }
+
+        .hud-label {
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .hud-value {
+            color: var(--world-emerald);
+            font-weight: 600;
+        }
+
+        /* Prediction Panel */
+        .prediction-section {
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .prediction-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .prediction-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .prediction-mode {
+            font-size: 0.7rem;
+            padding: 0.3rem 0.75rem;
+            background: var(--bg-surface);
+            border-radius: 20px;
+            color: var(--world-emerald);
+        }
+
+        .prediction-timeline {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding: 0.5rem 0;
+        }
+
+        .timeline-frame {
+            flex-shrink: 0;
+            width: 80px;
+            height: 60px;
+            background: var(--bg-surface);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .timeline-frame:hover {
+            border-color: var(--world-blue);
+            transform: scale(1.05);
+        }
+
+        .timeline-frame.active {
+            border-color: var(--world-emerald);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .frame-time {
+            position: absolute;
+            bottom: -20px;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+        }
+
+        .timeline-arrow {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        /* Control Panel */
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .control-btn {
+            padding: 1rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-light);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .control-btn:hover {
+            background: var(--bg-card);
+            border-color: var(--world-blue);
+            transform: translateY(-2px);
+        }
+
+        .control-icon {
+            font-size: 1.5rem;
+        }
+
+        .btn-primary {
+            grid-column: span 2;
+            background: var(--gradient-world);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 1.1rem;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .metric-large {
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-large::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-world);
+        }
+
+        .metric-large-value {
+            font-family: 'Source Code Pro', monospace;
+            font-size: 2.8rem;
+            font-weight: 700;
+            background: var(--gradient-world);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .metric-large-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0.5rem;
+        }
+
+        .stats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.9rem;
+            background: var(--bg-elevated);
+            border-radius: 10px;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-value {
+            font-family: 'Source Code Pro', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-white);
+        }
+
+        /* Efficiency Gauge */
+        .gauge-container {
+            display: flex;
+            justify-content: center;
+            padding: 1rem 0;
+        }
+
+        .gauge {
+            width: 160px;
+            height: 80px;
+            position: relative;
+        }
+
+        .gauge-bg {
+            position: absolute;
+            width: 160px;
+            height: 80px;
+            border-radius: 80px 80px 0 0;
+            background: var(--bg-surface);
+            overflow: hidden;
+        }
+
+        .gauge-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 160px;
+            height: 80px;
+            background: var(--gradient-world);
+            transform-origin: bottom center;
+            transform: rotate(0deg);
+            transition: transform 1s ease-out;
+        }
+
+        .gauge-cover {
+            position: absolute;
+            bottom: 0;
+            left: 10px;
+            width: 140px;
+            height: 70px;
+            background: var(--bg-card);
+            border-radius: 70px 70px 0 0;
+        }
+
+        .gauge-value {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Source Code Pro', monospace;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--world-emerald);
+        }
+
+        .gauge-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* Event Log */
+        .event-log {
+            max-height: 180px;
+            overflow-y: auto;
+            font-family: 'Source Code Pro', monospace;
+            font-size: 0.7rem;
+        }
+
+        .event-entry {
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+
+        .event-time {
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .event-type {
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .event-type.predict { background: rgba(139, 92, 246, 0.2); color: var(--world-violet); }
+        .event-type.action { background: rgba(59, 130, 246, 0.2); color: var(--world-blue); }
+        .event-type.adapt { background: rgba(16, 185, 129, 0.2); color: var(--world-emerald); }
+        .event-type.collision { background: rgba(244, 63, 94, 0.2); color: var(--world-rose); }
+
+        .event-message {
+            color: var(--text-light);
+            flex: 1;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--world-emerald);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-icon { font-size: 1.25rem; }
+        .toast-title { font-size: 0.85rem; font-weight: 600; }
+        .toast-message { font-size: 0.7rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="perspective-grid"></div>
+
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-cube">
+                    <div class="cube-face front"></div>
+                    <div class="cube-face back"></div>
+                    <div class="cube-face left"></div>
+                    <div class="cube-face right"></div>
+                    <div class="cube-face top"></div>
+                    <div class="cube-face bottom"></div>
+                </div>
+                <div>
+                    <div class="logo-text">AdaptWorld</div>
+                    <div class="logo-subtitle">World Models for Physical AI</div>
+                </div>
+            </div>
+            <div class="header-badges">
+                <span class="badge active">Edge-Ready</span>
+                <span class="badge">Low-Latency</span>
+                <span class="badge">Energy Efficient</span>
+                <span class="badge">Adaption Labs</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="hero">
+            <h1>⬢ Physical World Simulation</h1>
+            <p>Lightweight world models that enable robots and autonomous systems to understand, 
+               predict, and adapt to physical environments — all running on edge devices.</p>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <span class="card-title-icon">🌍</span>
+                        Environment Selection
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="env-grid">
+                        <div class="env-card selected" onclick="selectEnvironment(0)" id="env-0">
+                            <div class="env-icon">🏭</div>
+                            <div class="env-name">Warehouse</div>
+                            <div class="env-desc">Industrial logistics environment</div>
+                            <div class="env-stats">
+                                <span class="env-stat"><span class="env-stat-value">24</span> objects</span>
+                                <span class="env-stat"><span class="env-stat-value">3</span> agents</span>
+                            </div>
+                        </div>
+                        <div class="env-card" onclick="selectEnvironment(1)" id="env-1">
+                            <div class="env-icon">🏥</div>
+                            <div class="env-name">Hospital</div>
+                            <div class="env-desc">Healthcare navigation</div>
+                            <div class="env-stats">
+                                <span class="env-stat"><span class="env-stat-value">18</span> objects</span>
+                                <span class="env-stat"><span class="env-stat-value">2</span> agents</span>
+                            </div>
+                        </div>
+                        <div class="env-card" onclick="selectEnvironment(2)" id="env-2">
+                            <div class="env-icon">🚗</div>
+                            <div class="env-name">Urban</div>
+                            <div class="env-desc">Autonomous driving</div>
+                            <div class="env-stats">
+                                <span class="env-stat"><span class="env-stat-value">42</span> objects</span>
+                                <span class="env-stat"><span class="env-stat-value">8</span> agents</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="world-container" id="worldContainer">
+                        <div class="world-canvas" id="worldCanvas">
+                            <div class="world-grid"></div>
+                        </div>
+                        <div class="world-hud">
+                            <div class="hud-item">
+                                <div class="hud-label">Timestep</div>
+                                <div class="hud-value" id="timestep">t=0</div>
+                            </div>
+                            <div class="hud-item">
+                                <div class="hud-label">Prediction Horizon</div>
+                                <div class="hud-value" id="horizon">+5 frames</div>
+                            </div>
+                            <div class="hud-item">
+                                <div class="hud-label">Inference</div>
+                                <div class="hud-value" id="inference">4.2ms</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="prediction-section">
+                        <div class="prediction-header">
+                            <span class="prediction-title">🔮 Future State Predictions</span>
+                            <span class="prediction-mode" id="predictionMode">Idle</span>
+                        </div>
+                        <div class="prediction-timeline" id="predictionTimeline">
+                            <div class="timeline-frame active">
+                                <span>📍</span>
+                                <span class="frame-time">Now</span>
+                            </div>
+                            <span class="timeline-arrow">→</span>
+                            <div class="timeline-frame">
+                                <span>🔵</span>
+                                <span class="frame-time">+100ms</span>
+                            </div>
+                            <span class="timeline-arrow">→</span>
+                            <div class="timeline-frame">
+                                <span>🔵</span>
+                                <span class="frame-time">+200ms</span>
+                            </div>
+                            <span class="timeline-arrow">→</span>
+                            <div class="timeline-frame">
+                                <span>🔵</span>
+                                <span class="frame-time">+300ms</span>
+                            </div>
+                            <span class="timeline-arrow">→</span>
+                            <div class="timeline-frame">
+                                <span>🔵</span>
+                                <span class="frame-time">+400ms</span>
+                            </div>
+                            <span class="timeline-arrow">→</span>
+                            <div class="timeline-frame">
+                                <span>🎯</span>
+                                <span class="frame-time">+500ms</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-grid">
+                        <button class="control-btn" onclick="runPrediction()">
+                            <span class="control-icon">🔮</span>
+                            <span>Predict Future</span>
+                        </button>
+                        <button class="control-btn" onclick="resetWorld()">
+                            <span class="control-icon">↺</span>
+                            <span>Reset World</span>
+                        </button>
+                        <button class="control-btn" onclick="addObstacle()">
+                            <span class="control-icon">🧱</span>
+                            <span>Add Obstacle</span>
+                        </button>
+                        <button class="control-btn" onclick="moveTarget()">
+                            <span class="control-icon">🎯</span>
+                            <span>Move Target</span>
+                        </button>
+                        <button class="control-btn btn-primary" id="simulateBtn" onclick="toggleSimulation()">
+                            <span>▶ Start Simulation</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <span class="card-title-icon">⚡</span>
+                            Model Performance
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="metric-large">
+                            <div class="metric-large-value" id="predictionAccuracy">97.3%</div>
+                            <div class="metric-large-label">Prediction Accuracy</div>
+                        </div>
+
+                        <div class="gauge-container">
+                            <div class="gauge">
+                                <div class="gauge-bg">
+                                    <div class="gauge-fill" id="gaugeFill"></div>
+                                </div>
+                                <div class="gauge-cover"></div>
+                                <div class="gauge-value" id="gaugeValue">0%</div>
+                                <div class="gauge-label">Energy Efficiency</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <span class="card-title-icon">📊</span>
+                            System Metrics
+                        </h3>
+                    </div>
+                    <div class="card-body" style="padding: 1rem;">
+                        <div class="stats-list">
+                            <div class="stat-row">
+                                <span class="stat-label">⏱️ Inference Time</span>
+                                <span class="stat-value" id="inferenceTime">4.2ms</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">💾 Memory Usage</span>
+                                <span class="stat-value" id="memoryUsage">42MB</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">⚡ Power Draw</span>
+                                <span class="stat-value" id="powerDraw">0.8W</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">🎯 Collision Avoided</span>
+                                <span class="stat-value" id="collisionsAvoided">0</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">🔄 Adaptations</span>
+                                <span class="stat-value" id="worldAdaptations">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <span class="card-title-icon">📋</span>
+                            Event Log
+                        </h3>
+                    </div>
+                    <div class="card-body" style="padding: 0.75rem;">
+                        <div class="event-log" id="eventLog">
+                            <div class="event-entry">
+                                <span class="event-time">00:00:00</span>
+                                <span class="event-type adapt">INIT</span>
+                                <span class="event-message">World model initialized</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="toast" id="toast">
+        <span class="toast-icon">✓</span>
+        <div>
+            <div class="toast-title" id="toastTitle">Success</div>
+            <div class="toast-message" id="toastMessage">Operation completed</div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let isSimulating = false;
+        let selectedEnv = 0;
+        let timestep = 0;
+        let collisionsAvoided = 0;
+        let adaptations = 0;
+        let simulationInterval = null;
+
+        // World objects
+        let robot = { x: 100, y: 300, targetX: 0, targetY: 0 };
+        let target = { x: 500, y: 150 };
+        let obstacles = [
+            { x: 250, y: 200, w: 60, h: 40 },
+            { x: 350, y: 280, w: 50, h: 50 },
+            { x: 450, y: 180, w: 45, h: 60 }
+        ];
+
+        const environments = [
+            { name: 'Warehouse', objects: 24, agents: 3 },
+            { name: 'Hospital', objects: 18, agents: 2 },
+            { name: 'Urban', objects: 42, agents: 8 }
+        ];
+
+        function init() {
+            renderWorld();
+            setGauge(92);
+        }
+
+        function renderWorld() {
+            const canvas = document.getElementById('worldCanvas');
+            
+            // Clear existing objects
+            canvas.querySelectorAll('.world-object').forEach(el => el.remove());
+            canvas.querySelectorAll('.prediction-path').forEach(el => el.remove());
+
+            // Render robot
+            const robotEl = document.createElement('div');
+            robotEl.className = 'world-object robot';
+            robotEl.style.left = robot.x + 'px';
+            robotEl.style.top = robot.y + 'px';
+            canvas.appendChild(robotEl);
+
+            // Render target
+            const targetEl = document.createElement('div');
+            targetEl.className = 'world-object target';
+            targetEl.style.left = target.x + 'px';
+            targetEl.style.top = target.y + 'px';
+            targetEl.style.width = '30px';
+            targetEl.style.height = '30px';
+            canvas.appendChild(targetEl);
+
+            // Render obstacles
+            obstacles.forEach(obs => {
+                const obsEl = document.createElement('div');
+                obsEl.className = 'world-object obstacle';
+                obsEl.style.left = obs.x + 'px';
+                obsEl.style.top = obs.y + 'px';
+                obsEl.style.width = obs.w + 'px';
+                obsEl.style.height = obs.h + 'px';
+                canvas.appendChild(obsEl);
+            });
+        }
+
+        function selectEnvironment(index) {
+            document.querySelectorAll('.env-card').forEach((card, i) => {
+                card.classList.toggle('selected', i === index);
+            });
+            selectedEnv = index;
+            showToast('Environment Changed', `Loaded ${environments[index].name} environment`);
+            addEvent('adapt', `Switched to ${environments[index].name} environment`);
+            resetWorld();
+        }
+
+        function toggleSimulation() {
+            if (isSimulating) {
+                stopSimulation();
+            } else {
+                startSimulation();
+            }
+        }
+
+        function startSimulation() {
+            isSimulating = true;
+            document.getElementById('simulateBtn').innerHTML = '■ Stop Simulation';
+            document.getElementById('predictionMode').textContent = 'Active';
+            document.getElementById('predictionMode').style.background = 'rgba(16, 185, 129, 0.2)';
+            
+            showToast('Simulation Started', 'World model is now running');
+            addEvent('action', 'Simulation started');
+
+            simulationInterval = setInterval(updateSimulation, 50);
+        }
+
+        function stopSimulation() {
+            isSimulating = false;
+            clearInterval(simulationInterval);
+            document.getElementById('simulateBtn').innerHTML = '▶ Start Simulation';
+            document.getElementById('predictionMode').textContent = 'Paused';
+            document.getElementById('predictionMode').style.background = 'var(--bg-surface)';
+            
+            showToast('Simulation Paused', 'World state preserved');
+            addEvent('action', 'Simulation paused');
+        }
+
+        function updateSimulation() {
+            timestep++;
+            document.getElementById('timestep').textContent = `t=${timestep}`;
+
+            // Move robot towards target with obstacle avoidance
+            const dx = target.x - robot.x;
+            const dy = target.y - robot.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > 5) {
+                let moveX = (dx / dist) * 3;
+                let moveY = (dy / dist) * 3;
+
+                // Simple obstacle avoidance
+                obstacles.forEach(obs => {
+                    const obsDx = robot.x - (obs.x + obs.w / 2);
+                    const obsDy = robot.y - (obs.y + obs.h / 2);
+                    const obsDist = Math.sqrt(obsDx * obsDx + obsDy * obsDy);
+                    
+                    if (obsDist < 80) {
+                        moveX += (obsDx / obsDist) * 2;
+                        moveY += (obsDy / obsDist) * 2;
+                        
+                        if (obsDist < 50 && Math.random() < 0.1) {
+                            collisionsAvoided++;
+                            document.getElementById('collisionsAvoided').textContent = collisionsAvoided;
+                            addEvent('predict', 'Collision predicted and avoided');
+                        }
+                    }
+                });
+
+                robot.x += moveX;
+                robot.y += moveY;
+
+                // Keep in bounds
+                robot.x = Math.max(25, Math.min(robot.x, 600));
+                robot.y = Math.max(35, Math.min(robot.y, 350));
+            }
+
+            // Update metrics
+            document.getElementById('inferenceTime').textContent = (Math.random() * 2 + 3).toFixed(1) + 'ms';
+            document.getElementById('inference').textContent = (Math.random() * 2 + 3).toFixed(1) + 'ms';
+            document.getElementById('memoryUsage').textContent = Math.floor(Math.random() * 5 + 40) + 'MB';
+            document.getElementById('powerDraw').textContent = (Math.random() * 0.3 + 0.6).toFixed(1) + 'W';
+
+            // Random adaptation
+            if (Math.random() < 0.02) {
+                adaptations++;
+                document.getElementById('worldAdaptations').textContent = adaptations;
+                addEvent('adapt', 'Model adapted to new observation');
+            }
+
+            renderWorld();
+        }
+
+        function runPrediction() {
+            addEvent('predict', 'Running 5-frame prediction');
+            
+            const canvas = document.getElementById('worldCanvas');
+            const pathContainer = document.createElement('div');
+            pathContainer.className = 'prediction-path';
+            
+            // Calculate predicted path
+            let predX = robot.x;
+            let predY = robot.y;
+            
+            for (let i = 0; i < 5; i++) {
+                const dx = target.x - predX;
+                const dy = target.y - predY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                predX += (dx / dist) * 30;
+                predY += (dy / dist) * 30;
+                
+                const dot = document.createElement('div');
+                dot.className = 'path-dot';
+                dot.style.left = predX + 'px';
+                dot.style.top = predY + 'px';
+                dot.style.opacity = 1 - (i * 0.15);
+                pathContainer.appendChild(dot);
+            }
+            
+            canvas.appendChild(pathContainer);
+            
+            // Update timeline
+            const frames = document.querySelectorAll('.timeline-frame');
+            frames.forEach((frame, i) => {
+                setTimeout(() => {
+                    frames.forEach(f => f.classList.remove('active'));
+                    frame.classList.add('active');
+                }, i * 200);
+            });
+            
+            setTimeout(() => pathContainer.remove(), 2000);
+            showToast('Prediction Complete', '5-frame trajectory computed');
+        }
+
+        function resetWorld() {
+            robot = { x: 100, y: 300 };
+            target = { x: 500, y: 150 };
+            obstacles = [
+                { x: 250, y: 200, w: 60, h: 40 },
+                { x: 350, y: 280, w: 50, h: 50 },
+                { x: 450, y: 180, w: 45, h: 60 }
+            ];
+            timestep = 0;
+            document.getElementById('timestep').textContent = 't=0';
+            renderWorld();
+            addEvent('adapt', 'World state reset');
+            showToast('World Reset', 'Environment restored to initial state');
+        }
+
+        function addObstacle() {
+            const newObs = {
+                x: Math.random() * 400 + 150,
+                y: Math.random() * 200 + 100,
+                w: Math.random() * 30 + 30,
+                h: Math.random() * 30 + 30
+            };
+            obstacles.push(newObs);
+            renderWorld();
+            addEvent('adapt', 'New obstacle added to environment');
+            showToast('Obstacle Added', 'World model updated');
+        }
+
+        function moveTarget() {
+            target.x = Math.random() * 400 + 150;
+            target.y = Math.random() * 250 + 50;
+            renderWorld();
+            addEvent('action', 'Target location changed');
+            showToast('Target Moved', 'New goal position set');
+        }
+
+        function setGauge(value) {
+            const rotation = (value / 100) * 180;
+            document.getElementById('gaugeFill').style.transform = `rotate(${rotation}deg)`;
+            document.getElementById('gaugeValue').textContent = value + '%';
+        }
+
+        function addEvent(type, message) {
+            const log = document.getElementById('eventLog');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            
+            const entry = document.createElement('div');
+            entry.className = 'event-entry';
+            entry.innerHTML = `
+                <span class="event-time">${time}</span>
+                <span class="event-type ${type}">${type.toUpperCase()}</span>
+                <span class="event-message">${message}</span>
+            `;
+            
+            log.insertBefore(entry, log.firstChild);
+            if (log.children.length > 30) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function showToast(title, message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
